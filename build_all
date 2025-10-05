@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+wasmbuild="$project_root/scripts/wasmbuild"
+cache_dir="${WASM_BUILD_CACHE:-build}"
+
+modules=(
+  "wat/quicksort.wat"
+  "demos/realtime_ns.wat"
+  "tests/hello_nerds.wat"
+)
+
+for target in "${modules[@]}"; do
+  printf 'Building %s\n' "$target"
+  output_path=$("$wasmbuild" --cache "$cache_dir" "$project_root/$target")
+  printf '  -> %s\n' "$output_path"
+done

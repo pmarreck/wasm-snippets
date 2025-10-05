@@ -1,1 +1,9 @@
 target/
+*.wasm
+*.wasmer
+*.wasmedge
+build/
+wat/build/
+build/bench-latest.json
+.jj
+.direnv
