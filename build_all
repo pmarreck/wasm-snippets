@@ -5,8 +5,8 @@ wasmbuild="$project_root/scripts/wasmbuild"
 cache_dir="${WASM_BUILD_CACHE:-build}"
 
 modules=(
-  "wat/quicksort.wat"
-  "demos/realtime_ns.wat"
+  "scripts/quicksort"
+  "demos/ns"
   "tests/hello_nerds.wat"
 )
 

@@ -13,7 +13,8 @@ trap 'rm -rf "$tmpdir"' EXIT
 hello_wat="tests/hello_nerds.wat"
 expected_output="hello, nerds!"
 
-quicksort_wat="wat/quicksort.wat"
+quicksort_module="$project_root/scripts/quicksort"
+ns_demo="$project_root/demos/ns"
 input_file="data/sample_unsorted.txt"
 
 require_helpers() {
@@ -42,13 +43,25 @@ run_quicksort_locale() {
 		exit 1
 	fi
 
-	if ! LC_ALL="$locale" "$wasmrun" --cache build wasmtime "$quicksort_wat" < "$input_file" > "$actual"; then
+	if ! LC_ALL="$locale" "$wasmrun" --cache build wasmtime "$quicksort_module" < "$input_file" > "$actual"; then
 		echo "wasm run failed for LC_ALL=$locale" >&2
 		exit 1
 	fi
 
 	diff -u "$expected" "$actual"
 	printf 'quicksort matches sort for LC_ALL=%s\n' "$locale"
+}
+
+run_ns_override() {
+	local expected="1700000000.123456789"
+	local output
+	output=$(printf '\x15\xcd\x85\x3d\xfe\x9c\x97\x17' | "$ns_demo")
+	output=${output%$'\n'}
+	if [ "$output" != "$expected" ]; then
+		echo "ns stdin override mismatch: $output" >&2
+		exit 1
+	fi
+	printf 'ns stdin override via pipe ok\n'
 }
 
 run_helper_tests() {
@@ -140,9 +153,10 @@ require_helpers
 check_inputs
 
 # Ensure quicksort artefact exists at least once before running comparisons.
-"$wasmbuild" --cache build "$quicksort_wat" >/dev/null
+"$wasmbuild" --cache build "$quicksort_module" >/dev/null
 
 run_quicksort_locale C
 run_quicksort_locale en_US.UTF-8
 
+run_ns_override
 run_helper_tests

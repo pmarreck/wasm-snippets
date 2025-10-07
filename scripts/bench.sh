@@ -22,7 +22,7 @@ fi
 
 mkdir -p build
 # Pre-build the module so caches exist before benchmarking.
-$wasmbuild_path --cache build wat/quicksort.wat >/dev/null
+$wasmbuild_path --cache build scripts/quicksort >/dev/null
 
 runners=(
 	wasmtime
@@ -64,7 +64,7 @@ run_with_wasmrun() {
 	local runner="$1"
 	local outfile="$2"
 	local cache_dir="$3"
-	LC_ALL="$locale" LC_COLLATE="$locale" "$wasmrun_path" --cache "$cache_dir" "$runner" wat/quicksort.wat < "$input_file" > "$outfile"
+	LC_ALL="$locale" LC_COLLATE="$locale" "$wasmrun_path" --cache "$cache_dir" "$runner" scripts/quicksort < "$input_file" > "$outfile"
 }
 
 successful=()
@@ -102,7 +102,7 @@ for runner in "${available[@]}"; do
 	script="$tmp_dir/run-$runner.sh"
 	cat > "$script" <<SCRIPT
 #!/usr/bin/env sh
-LC_ALL=$locale LC_COLLATE=$locale exec "$wasmrun_path" --cache "$cache_dir" "$runner" "$project_root/wat/quicksort.wat" < "$input_file" > /dev/null
+LC_ALL=$locale LC_COLLATE=$locale exec "$wasmrun_path" --cache "$cache_dir" "$runner" "$project_root/scripts/quicksort" < "$input_file" > /dev/null
 SCRIPT
 	chmod +x "$script"
 	hyperfine_args+=( -n "$runner" "$script" )
