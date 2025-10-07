@@ -2,8 +2,17 @@
 
 Use this guide to work efficiently within the wasm-snippets playground (quicksort, demos, and helpers).
 
+**Policy:** All runnable demos/utilities in this repository must stay in WAT/WebAssembly text format. Keep support wrappers minimal and avoid rewriting demos in other languages.
+
+**Additional rules:**
+- Do not introduce Python dependencies; prefer existing shell/Wasm tooling for scripts and tests.
+- Follow strict TDD: write or update a failing test *before* implementing a feature or fix.
+- Tests for command-line programs must be pure POSIX shell (no Python/perl/etc.).
+- Avoid touching the filesystem in tests unless absolutely necessary (use pipes/temps in memory where possible).
+
 ## Project Structure & Module Organization
-- `scripts/` contains runnable modules like `quicksort` (WAT with a wasmrun shebang).
+- `scripts/` contains runnable modules like `quicksort` (WAT with a wasmrun shebang) and helpers
+  such as `progressbar_ensure_terminates` (a timeout wrapper for demos).
 - `scripts/wasmbuild` compiles `.wat`/shebang sources; `scripts/wasmrun` launches them with the selected runtime.
 - `wat/` now just holds build caches (`wat/build/`).
 - `tests/` hosts fixtures and `run.sh`; `test` is the entry point used by CI scripts.

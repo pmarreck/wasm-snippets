@@ -53,6 +53,7 @@
             pkgs.binaryen
             pkgs.jq
             pkgs.python3
+            pkgs.emscripten
           ];
         };
       }

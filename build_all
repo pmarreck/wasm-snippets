@@ -7,6 +7,7 @@ cache_dir="${WASM_BUILD_CACHE:-build}"
 modules=(
   "scripts/quicksort"
   "demos/ns"
+  "demos/progressbar"
   "tests/hello_nerds.wat"
 )
 

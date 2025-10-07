@@ -44,3 +44,17 @@ fast when nothing changed.
 
 Because stdin overrides expect raw bytes, you can generate fixtures without
 depending on the host clock or adding new dependencies to the project.
+
+## `progressbar`
+
+Renders a single line of block characters scaled to the terminal width.
+
+```
+printf "50\n" | ./demos/progressbar
+```
+
+When you need a deterministic width (for example, in automated tests or when the
+shell’s `COLUMNS` value isn’t meaningful), set `COLUMNS_OVERRIDE=<columns>`; the
+demo consults that variable first and only falls back to `COLUMNS`. Pass `-c` or
+`--cont` to reuse the same line (it pads the remainder with spaces and omits the
+trailing newline).

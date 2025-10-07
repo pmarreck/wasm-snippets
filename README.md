@@ -12,8 +12,8 @@ easily inspectable and runnable with the provided helpers.
 - `scripts/` – Helper utilities (`wasmbuild`, `wasmrun`) and directly-runnable "wat executables" like `quicksort` and `ns`.
 - `tests/` – `run.sh` orchestrates all automated checks; `hello_nerds.wat` is the fixture module for helper tests.
 - `data/` – Sample input (`sample_unsorted.txt`) and benchmark payloads.
-- `demos/` – Small explorations of WASI features; `ns` prints the
-  host realtime clock in nanoseconds.
+- `demos/` – WASI/WAT demos; e.g. `ns` prints realtime clock, `progressbar`
+  renders a single-shot bar, and `factor` is an emscripten-converted utility.
 - `bench`, `build_all`, `test` – Top-level convenience wrappers around the
   scripts in `scripts/`.
 - `flake.nix` / `.envrc` – Development shell provisioning via Nix and direnv.
@@ -55,11 +55,14 @@ because that route requires temporary files (I dislike touching the disk unless 
 nix develop -c ./test
 ```
 
-`tests/run.sh` performs two groups of checks:
+`tests/run.sh` performs three groups of checks:
 
 1. Behavioral parity – For `LC_ALL=C` and `LC_ALL=en_US.UTF-8`, quicksort's
    output must match the native `sort` command on `data/sample_unsorted.txt`.
-2. Helper coverage – Exercises `wasmbuild`/`wasmrun` cache paths, `-o` and
+2. Demo smoke tests – Drives the WASI snippets (`demos/ns`, `demos/progressbar`,
+   and `demos/factor`) to ensure CLI expectations, locale/env plumbing, and
+   error handling stay intact.
+3. Helper coverage – Exercises `wasmbuild`/`wasmrun` cache paths, `-o` and
    `--cache` overrides, and the AOT flows for Wasmer and WasmEdge using the
    `tests/hello_nerds.wat` fixture.
 
@@ -102,10 +105,21 @@ Each demo is executable thanks to the `wasmrun` shebang:
 ```
 chmod +x demos/ns    # only needed once if the repo was cloned without exec bits
 ./demos/ns
+# other examples
+printf '50\n' | ./demos/progressbar
+printf '42\n' | ./demos/factor
 ```
 
 `ns` shows how to call WASI’s `clock_time_get` for nanosecond
-resolution and can be driven (as in a test context) by piping an 8-byte little-endian override on stdin.
+  resolution and can be driven (as in a test context) by piping an 8-byte little-endian override on stdin.
+`progressbar` renders a single-shot textual bar using `COLUMNS`. Set
+  `COLUMNS_OVERRIDE` to force a specific width (even when `COLUMNS` mirrors the
+  interactive terminal); use `scripts/progressbar_ensure_terminates` if you want a 5s guard
+  around the bar demo.
+`factor` is the classic BSD utility converted back to WAT: feed newline-delimited
+  integers on stdin and it prints `n: p1 p2 …` prime factorizations. Invalid
+  lines trigger `factor: invalid input: …` warnings on stderr while the module
+  keeps processing the rest of the stream.
 
 New demo ideas worth exploring:
 

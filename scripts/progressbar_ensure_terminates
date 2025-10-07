@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+duration="${PROGRESSBAR_TIMEOUT:-5}"
+timeout_bin="${TIMEOUT_BIN:-timeout}"
+
+if ! command -v "$timeout_bin" >/dev/null 2>&1; then
+  echo "progressbar_ensure_terminates: missing '$timeout_bin' command" >&2
+  exit 127
+fi
+
+if "$timeout_bin" --foreground "${duration}s" "$project_root/demos/progressbar" "$@"; then
+  exit 0
+fi
+status=$?
+if [ "$status" -eq 124 ]; then
+  echo "progressbar timed out after ${duration}s" >&2
+fi
+exit "$status"

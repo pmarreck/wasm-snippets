@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE' >&2
+Usage: c2wat <source.c> [output-wat]
+
+Compiles a C source file to a WASI-compatible wasm module using emcc, converts
+it to WAT with wasm-tools, and applies a wasmrun shebang. The default output
+path replaces the .c suffix with no extension (executable script).
+USAGE
+}
+
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  usage
+  exit 64
+fi
+
+src=$1
+if [ ! -f "$src" ]; then
+  echo "c2wat: no such file: $src" >&2
+  exit 66
+fi
+
+if [ $# -eq 2 ]; then
+  out=$2
+else
+  out=${src%.c}
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+wasm="$tmpdir/module.wasm"
+wat="$tmpdir/module.wat"
+
+emcc "$src" -Os -s STANDALONE_WASM=1 -s WASM_BIGINT=0 -s EXPORTED_FUNCTIONS=['_main'] -o "$wasm"
+
+wasm-tools print "$wasm" -o "$wat"
+
+{
+  printf '#!/usr/bin/env wasmrun\n'
+  cat "$wat"
+} > "$out"
+
+chmod +x "$out"
+printf '%s\n' "$out"

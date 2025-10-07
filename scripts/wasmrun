@@ -156,16 +156,33 @@ case "$wasm_path" in
 esac
 
 locale=${LC_ALL:-C}
+columns_set=0
+if [ "${COLUMNS+x}" = x ]; then
+  columns_set=1
+  columns_value=$COLUMNS
+fi
 
 case "$runner" in
   wazero)
-    exec wazero run -env "LC_ALL=$locale" "$wasm_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wazero run -env "LC_ALL=$locale" -env "COLUMNS=$columns_value" "$wasm_path" "$@"
+    else
+      exec wazero run -env "LC_ALL=$locale" "$wasm_path" "$@"
+    fi
     ;;
   wasmtime)
-    exec wasmtime --env LC_ALL="$locale" "$wasm_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wasmtime --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$wasm_path" "$@"
+    else
+      exec wasmtime --env LC_ALL="$locale" "$wasm_path" "$@"
+    fi
     ;;
   wasmedge)
-    exec wasmedge --env LC_ALL="$locale" "$wasm_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$wasm_path" "$@"
+    else
+      exec wasmedge --env LC_ALL="$locale" "$wasm_path" "$@"
+    fi
     ;;
   wasmedge-aot)
     native_path="${native_base}.wasmedge"
@@ -175,10 +192,18 @@ case "$runner" in
         exit 1
       fi
     fi
-    exec wasmedge --env LC_ALL="$locale" "$native_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$native_path" "$@"
+    else
+      exec wasmedge --env LC_ALL="$locale" "$native_path" "$@"
+    fi
     ;;
   wasmer)
-    exec wasmer run --env "LC_ALL=$locale" "$wasm_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS=$columns_value" "$wasm_path" "$@"
+    else
+      exec wasmer run --env "LC_ALL=$locale" "$wasm_path" "$@"
+    fi
     ;;
   wasmer-aot)
     native_path="${native_base}.wasmer"
@@ -188,7 +213,11 @@ case "$runner" in
         exit 1
       fi
     fi
-    exec wasmer run --env "LC_ALL=$locale" "$native_path" "$@"
+    if [ "$columns_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS=$columns_value" "$native_path" "$@"
+    else
+      exec wasmer run --env "LC_ALL=$locale" "$native_path" "$@"
+    fi
     ;;
   deno)
     exec deno run --unstable --allow-run --allow-env --allow-read --quiet \

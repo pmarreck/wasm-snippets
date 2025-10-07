@@ -64,6 +64,117 @@ run_ns_override() {
 	printf 'ns stdin override via pipe ok\n'
 }
 
+run_factor_tests() {
+	local expected stdout_file stderr_file
+
+	expected="$tmpdir/factor-expected.txt"
+	stdout_file="$tmpdir/factor-stdout.txt"
+	stderr_file="$tmpdir/factor-stderr.txt"
+
+	printf '4294967295: 3 5 17 257 65537\n' >"$expected"
+	if ! diff -u "$expected" <(printf '4294967295\n' | PATH="$project_root/scripts:$PATH" timeout 5s "$project_root/demos/factor"); then
+		echo "factor happy-path mismatch" >&2
+		exit 1
+	fi
+
+	if ! printf 'wat\n12\n' | PATH="$project_root/scripts:$PATH" timeout 5s "$project_root/demos/factor" >"$stdout_file" 2>"$stderr_file"; then
+		echo "factor demo failed on mixed input" >&2
+		exit 1
+	fi
+
+	printf '12: 2 2 3\n' >"$expected"
+	if ! diff -u "$expected" "$stdout_file"; then
+		echo "factor stdout mismatch for mixed input" >&2
+		exit 1
+	fi
+
+	printf 'factor: invalid input: wat\n' >"$expected"
+	if ! diff -u "$expected" "$stderr_file"; then
+		echo "factor stderr mismatch for mixed input" >&2
+		exit 1
+	fi
+
+	printf 'factor demo checks ok\n'
+}
+
+run_progressbar_tests() {
+	local output progressbar_last_newline
+
+	run_progressbar_capture() {
+		local _var="$1"
+		local columns="$2"
+		local input="$3"
+		shift 3
+		local args=("$@")
+		local marker="__PB_STATUS__"
+		local combined output_text status has_newline=0
+
+		combined=$(
+			{
+				printf '%s' "$input" |
+					env -i PATH="$project_root/scripts:$PATH" \
+						LC_ALL="${LC_ALL:-C}" \
+						COLUMNS_OVERRIDE=${COLUMNS_OVERRIDE:-${COLUMNS:-}} \
+						timeout 5s "$project_root/demos/progressbar" "${args[@]}"
+				status=${PIPESTATUS[1]}
+				printf '%s%d' "$marker" "$status"
+			}
+		)
+		if [ "$combined" = "${combined%$marker*}" ]; then
+			echo "progressbar capture missing status marker" >&2
+			exit 1
+		fi
+		status=${combined##*$marker}
+		output_text=${combined%$marker*}
+		if [[ $output_text == *$'\n' ]]; then
+			has_newline=1
+			output_text=${output_text%$'\n'}
+		fi
+
+		if [ "$status" -eq 124 ]; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar command timed out" >&2
+			exit 1
+		elif [ "$status" -ne 0 ]; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar command failed with status $status" >&2
+			exit 1
+		fi
+		if pgrep -f "$project_root/demos/progressbar" >/dev/null 2>&1; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar process leaked after completion" >&2
+			exit 1
+		fi
+
+		progressbar_last_newline=$has_newline
+		printf -v "$_var" '%s' "$output_text"
+	}
+
+	run_progressbar_capture output 10 $'50\n'
+	if [ "${progressbar_last_newline:-0}" -ne 1 ]; then
+		echo "progressbar 50% missing newline" >&2
+		exit 1
+	fi
+	if [ "$output" != $'█████' ]; then
+		echo "progressbar 50% mismatch" >&2
+		printf 'got: %q\n' "$output" >&2
+		exit 1
+	fi
+
+	run_progressbar_capture output 8 $'75\n' -c
+	if [ "${progressbar_last_newline:-0}" -ne 0 ]; then
+		echo "progressbar -c emitted newline" >&2
+		exit 1
+	fi
+	if [ "$output" != $'██████  ' ]; then
+		echo "progressbar -c mismatch" >&2
+		printf 'got: %q\n' "$output" >&2
+		exit 1
+	fi
+
+	printf 'progressbar demo checks ok\n'
+}
+
 run_helper_tests() {
 	# 1. Default build path.
 	local default_path
@@ -159,4 +270,6 @@ run_quicksort_locale C
 run_quicksort_locale en_US.UTF-8
 
 run_ns_override
+run_factor_tests
+run_progressbar_tests
 run_helper_tests
