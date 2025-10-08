@@ -100,22 +100,54 @@ run_factor_tests() {
 run_progressbar_tests() {
 	local output progressbar_last_newline
 
+	progressbar_env_assignments() {
+		local mode="$1"
+		local columns="$2"
+	case "$mode" in
+	override)
+		printf 'COLUMNS_OVERRIDE=%s\n' "$columns"
+		;;
+	native)
+		printf 'COLUMNS=%s\n' "$columns"
+		;;
+	both)
+		local override_value native_value
+		override_value=${columns%%:*}
+		if [ "$override_value" = "$columns" ]; then
+			native_value=$override_value
+		else
+			native_value=${columns#*:}
+		fi
+		printf 'COLUMNS_OVERRIDE=%s\nCOLUMNS=%s\n' "$override_value" "$native_value"
+		;;
+	none | *)
+		;;
+	esac
+}
+
 	run_progressbar_capture() {
 		local _var="$1"
-		local columns="$2"
-		local input="$3"
-		shift 3
+		local mode="$2"
+		local columns="$3"
+		local input="$4"
+		shift 4
 		local args=("$@")
 		local marker="__PB_STATUS__"
 		local combined output_text status has_newline=0
+		local env_args=()
+		local assignment
+
+		while IFS= read -r assignment; do
+			env_args+=("$assignment")
+		done < <(progressbar_env_assignments "$mode" "$columns")
 
 		combined=$(
 			{
 				printf '%s' "$input" |
 					env -i PATH="$project_root/scripts:$PATH" \
 						LC_ALL="${LC_ALL:-C}" \
-						COLUMNS_OVERRIDE=${COLUMNS_OVERRIDE:-${COLUMNS:-}} \
-						timeout 5s "$project_root/demos/progressbar" "${args[@]}"
+						"${env_args[@]}" \
+						timeout 5s "$project_root/demos/progressbar" "${args[@]}" 2>&1
 				status=${PIPESTATUS[1]}
 				printf '%s%d' "$marker" "$status"
 			}
@@ -150,7 +182,62 @@ run_progressbar_tests() {
 		printf -v "$_var" '%s' "$output_text"
 	}
 
-	run_progressbar_capture output 10 $'50\n'
+	run_progressbar_expect_error() {
+		local mode="$1"
+		local columns="$2"
+		local input="$3"
+		local expected_message="$4"
+		shift 4
+		local args=("$@")
+		local marker="__PB_STATUS__"
+		local combined output_text status
+		local env_args=()
+		local assignment
+
+		while IFS= read -r assignment; do
+			env_args+=("$assignment")
+		done < <(progressbar_env_assignments "$mode" "$columns")
+
+		combined=$(
+			{
+				printf '%s' "$input" |
+					env -i PATH="$project_root/scripts:$PATH" \
+						LC_ALL="${LC_ALL:-C}" \
+						"${env_args[@]}" \
+						timeout 5s "$project_root/demos/progressbar" "${args[@]}" 2>&1
+				status=${PIPESTATUS[1]}
+				printf '%s%d' "$marker" "$status"
+			}
+		)
+		if [ "$combined" = "${combined%$marker*}" ]; then
+			echo "progressbar error capture missing status marker" >&2
+			exit 1
+		fi
+		status=${combined##*$marker}
+		output_text=${combined%$marker*}
+		output_text=${output_text%$'\n'}
+
+		if [ "$status" -eq 124 ]; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar command timed out during error check" >&2
+			exit 1
+		elif [ "$status" -ne 1 ]; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar expected exit 1, got $status" >&2
+			exit 1
+		fi
+		if pgrep -f "$project_root/demos/progressbar" >/dev/null 2>&1; then
+			pkill -f "$project_root/demos/progressbar" 2>/dev/null || true
+			echo "progressbar process leaked after error" >&2
+			exit 1
+		fi
+		if [ "$output_text" != "$expected_message" ]; then
+			printf 'progressbar error message mismatch: %q\n' "$output_text" >&2
+			exit 1
+		fi
+	}
+
+	run_progressbar_capture output override 10 $'50\n'
 	if [ "${progressbar_last_newline:-0}" -ne 1 ]; then
 		echo "progressbar 50% missing newline" >&2
 		exit 1
@@ -161,7 +248,7 @@ run_progressbar_tests() {
 		exit 1
 	fi
 
-	run_progressbar_capture output 8 $'75\n' -c
+	run_progressbar_capture output override 8 $'75\n' -c
 	if [ "${progressbar_last_newline:-0}" -ne 0 ]; then
 		echo "progressbar -c emitted newline" >&2
 		exit 1
@@ -171,6 +258,31 @@ run_progressbar_tests() {
 		printf 'got: %q\n' "$output" >&2
 		exit 1
 	fi
+
+	run_progressbar_capture output native 12 $'25\n'
+	if [ "${progressbar_last_newline:-0}" -ne 1 ]; then
+		echo "progressbar native columns missing newline" >&2
+		exit 1
+	fi
+	if [ "$output" != $'███' ]; then
+		echo "progressbar native columns mismatch" >&2
+		printf 'got: %q\n' "$output" >&2
+		exit 1
+	fi
+
+	run_progressbar_capture output both '6:20' $'50\n'
+	if [ "${progressbar_last_newline:-0}" -ne 1 ]; then
+		echo "progressbar override precedence missing newline" >&2
+		exit 1
+	fi
+	if [ "$output" != $'███' ]; then
+		echo "progressbar override precedence mismatch" >&2
+		printf 'got: %q\n' "$output" >&2
+		exit 1
+	fi
+
+	run_progressbar_expect_error none _ $'50\n' \
+		'progressbar: COLUMNS or COLUMNS_OVERRIDE unset'
 
 	printf 'progressbar demo checks ok\n'
 }

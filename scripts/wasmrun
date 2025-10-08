@@ -161,24 +161,41 @@ if [ "${COLUMNS+x}" = x ]; then
   columns_set=1
   columns_value=$COLUMNS
 fi
+override_set=0
+if [ "${COLUMNS_OVERRIDE+x}" = x ]; then
+  override_set=1
+  override_value=$COLUMNS_OVERRIDE
+fi
 
 case "$runner" in
   wazero)
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wazero run -env "LC_ALL=$locale" -env "COLUMNS_OVERRIDE=$override_value" -env "COLUMNS=$columns_value" "$wasm_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wazero run -env "LC_ALL=$locale" -env "COLUMNS_OVERRIDE=$override_value" "$wasm_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wazero run -env "LC_ALL=$locale" -env "COLUMNS=$columns_value" "$wasm_path" "$@"
     else
       exec wazero run -env "LC_ALL=$locale" "$wasm_path" "$@"
     fi
     ;;
   wasmtime)
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wasmtime --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" --env COLUMNS="$columns_value" "$wasm_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wasmtime --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" "$wasm_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wasmtime --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$wasm_path" "$@"
     else
       exec wasmtime --env LC_ALL="$locale" "$wasm_path" "$@"
     fi
     ;;
   wasmedge)
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" --env COLUMNS="$columns_value" "$wasm_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" "$wasm_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wasmedge --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$wasm_path" "$@"
     else
       exec wasmedge --env LC_ALL="$locale" "$wasm_path" "$@"
@@ -192,14 +209,22 @@ case "$runner" in
         exit 1
       fi
     fi
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" --env COLUMNS="$columns_value" "$native_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wasmedge --env LC_ALL="$locale" --env COLUMNS_OVERRIDE="$override_value" "$native_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wasmedge --env LC_ALL="$locale" --env COLUMNS="$columns_value" "$native_path" "$@"
     else
       exec wasmedge --env LC_ALL="$locale" "$native_path" "$@"
     fi
     ;;
   wasmer)
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS_OVERRIDE=$override_value" --env "COLUMNS=$columns_value" "$wasm_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS_OVERRIDE=$override_value" "$wasm_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS=$columns_value" "$wasm_path" "$@"
     else
       exec wasmer run --env "LC_ALL=$locale" "$wasm_path" "$@"
@@ -213,7 +238,11 @@ case "$runner" in
         exit 1
       fi
     fi
-    if [ "$columns_set" -eq 1 ]; then
+    if [ "$columns_set" -eq 1 ] && [ "$override_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS_OVERRIDE=$override_value" --env "COLUMNS=$columns_value" "$native_path" "$@"
+    elif [ "$override_set" -eq 1 ]; then
+      exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS_OVERRIDE=$override_value" "$native_path" "$@"
+    elif [ "$columns_set" -eq 1 ]; then
       exec wasmer run --env "LC_ALL=$locale" --env "COLUMNS=$columns_value" "$native_path" "$@"
     else
       exec wasmer run --env "LC_ALL=$locale" "$native_path" "$@"

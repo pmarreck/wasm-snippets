@@ -1,6 +1,8 @@
 #!/usr/bin/env wasmrun
 ;; progressbar - render a single progress bar in pure WAT.
-;; The module expects COLUMNS in the environment, reads one line from stdin
+;; The module expects a terminal width from the environment. It honors
+;; COLUMNS_OVERRIDE when present (for deterministic tests) and otherwise falls
+;; back to COLUMNS. The program reads one line from stdin
 ;; containing an integer percentage (0-100), and writes block characters to
 ;; stdout representing that portion of the terminal width. With `-c` it pads
 ;; the remainder of the line with spaces and omits the trailing newline so
@@ -29,7 +31,7 @@
   (data (i32.const 16016) "--continue\00")
   (data (i32.const 16032) "COLUMNS=\00")
   (data (i32.const 16048) "\0a")
-  (data (i32.const 16056) "progressbar: COLUMNS env var not set\0a")
+  (data (i32.const 16056) "progressbar: COLUMNS or COLUMNS_OVERRIDE unset\0a")
   (data (i32.const 16112) "progressbar: COLUMNS must be a positive integer\0a")
   (data (i32.const 16184) "progressbar: expected percentage on stdin\0a")
   (data (i32.const 16240) "progressbar: percentage must be an integer 0-100\0a")
@@ -136,8 +138,7 @@
     (local $bar_start i32)
     (local $bar_ptr i32)
     (local $bytes i32)
-    (local $override_found i32)
-    (local $candidate i32)
+    (local $columns_found i32)
 
     (local.set $use_continue (i32.const 0))
     (local.set $columns (i32.const -1))
@@ -177,14 +178,14 @@
           (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
           (br $argloop))))
 
-    ;; Locate COLUMNS in the environment.
+    ;; Locate a terminal width in the environment.
     (local.set $errno (call $environ_sizes_get (i32.const 8) (i32.const 12)))
     (if (i32.ne (local.get $errno) (i32.const 0))
       (then (call $proc_exit (local.get $errno))))
     (local.set $envc (i32.load (i32.const 8)))
     (local.set $envlen (i32.load (i32.const 12)))
     (if (i32.eqz (local.get $envc))
-      (then (call $exit_error (i32.const 16056) (i32.const 37))))
+      (then (call $exit_error (i32.const 16056) (i32.const 47))))
     (local.set $env_ptrs (i32.const 2048))
     (local.set $env_buf (i32.const 4096))
     (if (i32.gt_u
@@ -194,11 +195,11 @@
     (local.set $errno (call $environ_get (local.get $env_ptrs) (local.get $env_buf)))
     (if (i32.ne (local.get $errno) (i32.const 0))
       (then (call $proc_exit (local.get $errno))))
-    (local.set $override_found (i32.const 0))
+    (local.set $columns_found (i32.const 0))
     (local.set $idx (i32.const 0))
-    (block $override_done
+    (block $found_columns
       (loop $override_loop
-        (br_if $override_done (i32.ge_u (local.get $idx) (local.get $envc)))
+        (br_if $found_columns (i32.ge_u (local.get $idx) (local.get $envc)))
         (local.set $env_ptr
           (i32.load
             (i32.add
@@ -208,14 +209,12 @@
           (then
             (local.set $columns
               (call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 17))))
-            (if (i32.ge_s (local.get $columns) (i32.const 0))
-              (then
-                (local.set $override_found (i32.const 1))
-                (br $override_done)))))
+            (local.set $columns_found (i32.const 1))
+            (br $found_columns)))
         (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
         (br $override_loop)))
 
-    (if (i32.eqz (local.get $override_found))
+    (if (i32.lt_s (local.get $columns) (i32.const 0))
       (then
         (local.set $idx (i32.const 0))
         (block $envdone
@@ -230,12 +229,13 @@
               (then
                 (local.set $columns
                   (call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 8))))
+                (local.set $columns_found (i32.const 1))
                 (br $envdone)))
             (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
             (br $envloop)))))
-    (if (i32.lt_s (local.get $columns) (i32.const 0))
-      (then (call $exit_error (i32.const 16112) (i32.const 48))))
-    (if (i32.eqz (local.get $columns))
+    (if (i32.eqz (local.get $columns_found))
+      (then (call $exit_error (i32.const 16056) (i32.const 47))))
+    (if (i32.le_s (local.get $columns) (i32.const 0))
       (then (call $exit_error (i32.const 16112) (i32.const 48))))
 
     ;; Read one line from stdin.
