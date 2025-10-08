@@ -372,6 +372,32 @@ run_helper_tests() {
 	printf 'wasm helper tests passed\n'
 }
 
+run_bc_tests() {
+	local bc_build_dir bc_wasm bc_output
+
+	bc_build_dir="$tmpdir/bc-build"
+	if ! bc_wasm=$("$project_root/scripts/build_bc" --out "$bc_build_dir"); then
+		echo "build_bc command failed" >&2
+		exit 1
+	fi
+	if [ ! -f "$bc_wasm" ]; then
+		echo "build_bc did not produce wasm artefact" >&2
+		exit 1
+	fi
+
+	bc_output=$(
+		printf '2+3\nquit\n' |
+			"$wasmrun" --cache "$tmpdir/bc-cache" wasmtime "$bc_wasm"
+	)
+	bc_output=${bc_output%$'\n'}
+	if [ "$bc_output" != "5" ]; then
+		printf 'bc wasm result mismatch: %q\n' "$bc_output" >&2
+		exit 1
+	fi
+
+	printf 'bc wasm build smoke test ok\n'
+}
+
 require_helpers
 check_inputs
 
@@ -385,3 +411,4 @@ run_ns_override
 run_factor_tests
 run_progressbar_tests
 run_helper_tests
+run_bc_tests

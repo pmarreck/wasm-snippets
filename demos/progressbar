@@ -8,301 +8,301 @@
 ;; the remainder of the line with spaces and omits the trailing newline so
 ;; callers can redraw the same line.
 (module
-  (import "wasi_snapshot_preview1" "fd_read"
-    (func $fd_read (param i32 i32 i32 i32) (result i32)))
-  (import "wasi_snapshot_preview1" "fd_write"
-    (func $fd_write (param i32 i32 i32 i32) (result i32)))
-  (import "wasi_snapshot_preview1" "proc_exit"
-    (func $proc_exit (param i32)))
-  (import "wasi_snapshot_preview1" "args_sizes_get"
-    (func $args_sizes_get (param i32 i32) (result i32)))
-  (import "wasi_snapshot_preview1" "args_get"
-    (func $args_get (param i32 i32) (result i32)))
-  (import "wasi_snapshot_preview1" "environ_sizes_get"
-    (func $environ_sizes_get (param i32 i32) (result i32)))
-  (import "wasi_snapshot_preview1" "environ_get"
-    (func $environ_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_read"
+		(func $fd_read (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "fd_write"
+		(func $fd_write (param i32 i32 i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "proc_exit"
+		(func $proc_exit (param i32)))
+	(import "wasi_snapshot_preview1" "args_sizes_get"
+		(func $args_sizes_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "args_get"
+		(func $args_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "environ_sizes_get"
+		(func $environ_sizes_get (param i32 i32) (result i32)))
+	(import "wasi_snapshot_preview1" "environ_get"
+		(func $environ_get (param i32 i32) (result i32)))
 
-  (memory (export "memory") 1)
+	(memory (export "memory") 1)
 
-  ;; Literal data.
-  (data (i32.const 16000) "-c\00")
-  (data (i32.const 16008) "--cont\00")
-  (data (i32.const 16016) "--continue\00")
-  (data (i32.const 16032) "COLUMNS=\00")
-  (data (i32.const 16048) "\0a")
-  (data (i32.const 16056) "progressbar: COLUMNS or COLUMNS_OVERRIDE unset\0a")
-  (data (i32.const 16112) "progressbar: COLUMNS must be a positive integer\0a")
-  (data (i32.const 16184) "progressbar: expected percentage on stdin\0a")
-  (data (i32.const 16240) "progressbar: percentage must be an integer 0-100\0a")
-  (data (i32.const 16296) "COLUMNS_OVERRIDE=\00")
+	;; Literal data.
+	(data (i32.const 16000) "-c\00")
+	(data (i32.const 16008) "--cont\00")
+	(data (i32.const 16016) "--continue\00")
+	(data (i32.const 16032) "COLUMNS=\00")
+	(data (i32.const 16048) "\0a")
+	(data (i32.const 16056) "progressbar: COLUMNS or COLUMNS_OVERRIDE unset\0a")
+	(data (i32.const 16112) "progressbar: COLUMNS must be a positive integer\0a")
+	(data (i32.const 16184) "progressbar: expected percentage on stdin\0a")
+	(data (i32.const 16240) "progressbar: percentage must be an integer 0-100\0a")
+	(data (i32.const 16296) "COLUMNS_OVERRIDE=\00")
 
-  (func $write_fd (param $fd i32) (param $ptr i32) (param $len i32)
-    (local $errno i32)
-    (i32.store (i32.const 12000) (local.get $ptr))
-    (i32.store (i32.const 12004) (local.get $len))
-    (local.set $errno
-      (call $fd_write
-        (local.get $fd)
-        (i32.const 12000)
-        (i32.const 1)
-        (i32.const 12008)))
-    (if (i32.ne (local.get $errno) (i32.const 0))
-      (then (call $proc_exit (local.get $errno)))))
+	(func $write_fd (param $fd i32) (param $ptr i32) (param $len i32)
+		(local $errno i32)
+		(i32.store (i32.const 12000) (local.get $ptr))
+		(i32.store (i32.const 12004) (local.get $len))
+		(local.set $errno
+			(call $fd_write
+				(local.get $fd)
+				(i32.const 12000)
+				(i32.const 1)
+				(i32.const 12008)))
+		(if (i32.ne (local.get $errno) (i32.const 0))
+			(then (call $proc_exit (local.get $errno)))))
 
-  (func $exit_error (param $ptr i32) (param $len i32)
-    (call $write_fd (i32.const 2) (local.get $ptr) (local.get $len))
-    (call $proc_exit (i32.const 1)))
+	(func $exit_error (param $ptr i32) (param $len i32)
+		(call $write_fd (i32.const 2) (local.get $ptr) (local.get $len))
+		(call $proc_exit (i32.const 1)))
 
-  (func $starts_with (param $ptr i32) (param $lit i32) (result i32)
-    (local $idx i32)
-    (local $ch i32)
-    (local $lit_ch i32)
-    (loop $scan
-      (local.set $lit_ch (i32.load8_u (i32.add (local.get $lit) (local.get $idx))))
-      (if (i32.eqz (local.get $lit_ch)) (then (return (i32.const 1))))
-      (local.set $ch (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
-      (if (i32.ne (local.get $ch) (local.get $lit_ch))
-        (then (return (i32.const 0))))
-      (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-      (br $scan))
-    (i32.const 0))
+	(func $starts_with (param $ptr i32) (param $lit i32) (result i32)
+		(local $idx i32)
+		(local $ch i32)
+		(local $lit_ch i32)
+		(loop $scan
+			(local.set $lit_ch (i32.load8_u (i32.add (local.get $lit) (local.get $idx))))
+			(if (i32.eqz (local.get $lit_ch)) (then (return (i32.const 1))))
+			(local.set $ch (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
+			(if (i32.ne (local.get $ch) (local.get $lit_ch))
+				(then (return (i32.const 0))))
+			(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+			(br $scan))
+		(i32.const 0))
 
-  (func $parse_env_uint (param $ptr i32) (result i32)
-    (local $idx i32)
-    (local $value i32)
-    (local $digit i32)
-    (loop $parse
-      (local.set $digit (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
-      (if (i32.eqz (local.get $digit))
-        (then
-          (if (i32.eqz (local.get $idx)) (then (return (i32.const -1))))
-          (return (local.get $value))))
-      (local.set $digit (i32.sub (local.get $digit) (i32.const 48)))
-      (if (i32.lt_s (local.get $digit) (i32.const 0)) (then (return (i32.const -1))))
-      (if (i32.gt_s (local.get $digit) (i32.const 9)) (then (return (i32.const -1))))
-      (local.set $value
-        (i32.add
-          (i32.mul (local.get $value) (i32.const 10))
-          (local.get $digit)))
-      (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-      (br $parse))
-    (i32.const -1))
+	(func $parse_env_uint (param $ptr i32) (result i32)
+		(local $idx i32)
+		(local $value i32)
+		(local $digit i32)
+		(loop $parse
+			(local.set $digit (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
+			(if (i32.eqz (local.get $digit))
+				(then
+					(if (i32.eqz (local.get $idx)) (then (return (i32.const -1))))
+					(return (local.get $value))))
+			(local.set $digit (i32.sub (local.get $digit) (i32.const 48)))
+			(if (i32.lt_s (local.get $digit) (i32.const 0)) (then (return (i32.const -1))))
+			(if (i32.gt_s (local.get $digit) (i32.const 9)) (then (return (i32.const -1))))
+			(local.set $value
+				(i32.add
+					(i32.mul (local.get $value) (i32.const 10))
+					(local.get $digit)))
+			(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+			(br $parse))
+		(i32.const -1))
 
-  (func $parse_percent_line (param $ptr i32) (param $len i32) (result i32)
-    (local $limit i32)
-    (local $idx i32)
-    (local $value i32)
-    (local $digit i32)
-    (if (i32.eqz (local.get $len)) (then (return (i32.const -1))))
-    (if (i32.eq (local.get $len) (i32.const 1)) (then (return (i32.const -1))))
-    (local.set $limit (i32.sub (local.get $len) (i32.const 1)))
-    (if (i32.ne
-          (i32.load8_u (i32.add (local.get $ptr) (local.get $limit)))
-          (i32.const 10))
-      (then (return (i32.const -1))))
-    (block $done
-      (loop $loop
-        (br_if $done (i32.ge_u (local.get $idx) (local.get $limit)))
-        (local.set $digit (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
-        (local.set $digit (i32.sub (local.get $digit) (i32.const 48)))
-        (if (i32.lt_s (local.get $digit) (i32.const 0)) (then (return (i32.const -1))))
-        (if (i32.gt_s (local.get $digit) (i32.const 9)) (then (return (i32.const -1))))
-        (local.set $value
-          (i32.add
-            (i32.mul (local.get $value) (i32.const 10))
-            (local.get $digit)))
-        (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-        (br $loop)))
-    (local.get $value))
+	(func $parse_percent_line (param $ptr i32) (param $len i32) (result i32)
+		(local $limit i32)
+		(local $idx i32)
+		(local $value i32)
+		(local $digit i32)
+		(if (i32.eqz (local.get $len)) (then (return (i32.const -1))))
+		(if (i32.eq (local.get $len) (i32.const 1)) (then (return (i32.const -1))))
+		(local.set $limit (i32.sub (local.get $len) (i32.const 1)))
+		(if (i32.ne
+					(i32.load8_u (i32.add (local.get $ptr) (local.get $limit)))
+					(i32.const 10))
+			(then (return (i32.const -1))))
+		(block $done
+			(loop $loop
+				(br_if $done (i32.ge_u (local.get $idx) (local.get $limit)))
+				(local.set $digit (i32.load8_u (i32.add (local.get $ptr) (local.get $idx))))
+				(local.set $digit (i32.sub (local.get $digit) (i32.const 48)))
+				(if (i32.lt_s (local.get $digit) (i32.const 0)) (then (return (i32.const -1))))
+				(if (i32.gt_s (local.get $digit) (i32.const 9)) (then (return (i32.const -1))))
+				(local.set $value
+					(i32.add
+						(i32.mul (local.get $value) (i32.const 10))
+						(local.get $digit)))
+				(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+				(br $loop)))
+		(local.get $value))
 
-  (func (export "_start")
-    (local $errno i32)
-    (local $argc i32)
-    (local $arglen i32)
-    (local $argv_base i32)
-    (local $argv_buf i32)
-    (local $idx i32)
-    (local $arg_ptr i32)
-    (local $use_continue i32)
-    (local $envc i32)
-    (local $envlen i32)
-    (local $env_ptrs i32)
-    (local $env_buf i32)
-    (local $env_ptr i32)
-    (local $columns i32)
-    (local $read_len i32)
-    (local $percent i32)
-    (local $filled i32)
-    (local $remaining i32)
-    (local $bar_start i32)
-    (local $bar_ptr i32)
-    (local $bytes i32)
-    (local $columns_found i32)
+	(func (export "_start")
+		(local $errno i32)
+		(local $argc i32)
+		(local $arglen i32)
+		(local $argv_base i32)
+		(local $argv_buf i32)
+		(local $idx i32)
+		(local $arg_ptr i32)
+		(local $use_continue i32)
+		(local $envc i32)
+		(local $envlen i32)
+		(local $env_ptrs i32)
+		(local $env_buf i32)
+		(local $env_ptr i32)
+		(local $columns i32)
+		(local $read_len i32)
+		(local $percent i32)
+		(local $filled i32)
+		(local $remaining i32)
+		(local $bar_start i32)
+		(local $bar_ptr i32)
+		(local $bytes i32)
+		(local $columns_found i32)
 
-    (local.set $use_continue (i32.const 0))
-    (local.set $columns (i32.const -1))
+		(local.set $use_continue (i32.const 0))
+		(local.set $columns (i32.const -1))
 
-    ;; Parse argv for -c / --cont / --continue.
-    (local.set $errno (call $args_sizes_get (i32.const 0) (i32.const 4)))
-    (if (i32.ne (local.get $errno) (i32.const 0))
-      (then (call $proc_exit (local.get $errno))))
-    (local.set $argc (i32.load (i32.const 0)))
-    (local.set $arglen (i32.load (i32.const 4)))
-    (block $skip_args
-      (br_if $skip_args (i32.le_u (local.get $argc) (i32.const 1)))
-      (local.set $argv_base (i32.const 256))
-      (local.set $argv_buf (i32.const 512))
-      (if (i32.gt_u
-            (i32.add (local.get $argv_buf) (local.get $arglen))
-            (i32.const 65536))
-        (then (call $proc_exit (i32.const 75))))
-      (local.set $errno (call $args_get (local.get $argv_base) (local.get $argv_buf)))
-      (if (i32.ne (local.get $errno) (i32.const 0))
-        (then (call $proc_exit (local.get $errno))))
-      (local.set $idx (i32.const 1))
-      (block $argdone
-        (loop $argloop
-          (br_if $argdone (i32.ge_u (local.get $idx) (local.get $argc)))
-          (local.set $arg_ptr
-            (i32.load
-              (i32.add
-                (local.get $argv_base)
-                (i32.shl (local.get $idx) (i32.const 2)))))
-          (if (call $starts_with (local.get $arg_ptr) (i32.const 16000))
-            (then (local.set $use_continue (i32.const 1)) (br $argdone)))
-          (if (call $starts_with (local.get $arg_ptr) (i32.const 16008))
-            (then (local.set $use_continue (i32.const 1)) (br $argdone)))
-          (if (call $starts_with (local.get $arg_ptr) (i32.const 16016))
-            (then (local.set $use_continue (i32.const 1)) (br $argdone)))
-          (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-          (br $argloop))))
+		;; Parse argv for -c / --cont / --continue.
+		(local.set $errno (call $args_sizes_get (i32.const 0) (i32.const 4)))
+		(if (i32.ne (local.get $errno) (i32.const 0))
+			(then (call $proc_exit (local.get $errno))))
+		(local.set $argc (i32.load (i32.const 0)))
+		(local.set $arglen (i32.load (i32.const 4)))
+		(block $skip_args
+			(br_if $skip_args (i32.le_u (local.get $argc) (i32.const 1)))
+			(local.set $argv_base (i32.const 256))
+			(local.set $argv_buf (i32.const 512))
+			(if (i32.gt_u
+						(i32.add (local.get $argv_buf) (local.get $arglen))
+						(i32.const 65536))
+				(then (call $proc_exit (i32.const 75))))
+			(local.set $errno (call $args_get (local.get $argv_base) (local.get $argv_buf)))
+			(if (i32.ne (local.get $errno) (i32.const 0))
+				(then (call $proc_exit (local.get $errno))))
+			(local.set $idx (i32.const 1))
+			(block $argdone
+				(loop $argloop
+					(br_if $argdone (i32.ge_u (local.get $idx) (local.get $argc)))
+					(local.set $arg_ptr
+						(i32.load
+							(i32.add
+								(local.get $argv_base)
+								(i32.shl (local.get $idx) (i32.const 2)))))
+					(if (call $starts_with (local.get $arg_ptr) (i32.const 16000))
+						(then (local.set $use_continue (i32.const 1)) (br $argdone)))
+					(if (call $starts_with (local.get $arg_ptr) (i32.const 16008))
+						(then (local.set $use_continue (i32.const 1)) (br $argdone)))
+					(if (call $starts_with (local.get $arg_ptr) (i32.const 16016))
+						(then (local.set $use_continue (i32.const 1)) (br $argdone)))
+					(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+					(br $argloop))))
 
-    ;; Locate a terminal width in the environment.
-    (local.set $errno (call $environ_sizes_get (i32.const 8) (i32.const 12)))
-    (if (i32.ne (local.get $errno) (i32.const 0))
-      (then (call $proc_exit (local.get $errno))))
-    (local.set $envc (i32.load (i32.const 8)))
-    (local.set $envlen (i32.load (i32.const 12)))
-    (if (i32.eqz (local.get $envc))
-      (then (call $exit_error (i32.const 16056) (i32.const 47))))
-    (local.set $env_ptrs (i32.const 2048))
-    (local.set $env_buf (i32.const 4096))
-    (if (i32.gt_u
-          (i32.add (local.get $env_buf) (local.get $envlen))
-          (i32.const 65536))
-      (then (call $proc_exit (i32.const 75))))
-    (local.set $errno (call $environ_get (local.get $env_ptrs) (local.get $env_buf)))
-    (if (i32.ne (local.get $errno) (i32.const 0))
-      (then (call $proc_exit (local.get $errno))))
-    (local.set $columns_found (i32.const 0))
-    (local.set $idx (i32.const 0))
-    (block $found_columns
-      (loop $override_loop
-        (br_if $found_columns (i32.ge_u (local.get $idx) (local.get $envc)))
-        (local.set $env_ptr
-          (i32.load
-            (i32.add
-              (local.get $env_ptrs)
-              (i32.shl (local.get $idx) (i32.const 2)))))
-        (if (call $starts_with (local.get $env_ptr) (i32.const 16296))
-          (then
-            (local.set $columns
-              (call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 17))))
-            (local.set $columns_found (i32.const 1))
-            (br $found_columns)))
-        (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-        (br $override_loop)))
+		;; Locate a terminal width in the environment.
+		(local.set $errno (call $environ_sizes_get (i32.const 8) (i32.const 12)))
+		(if (i32.ne (local.get $errno) (i32.const 0))
+			(then (call $proc_exit (local.get $errno))))
+		(local.set $envc (i32.load (i32.const 8)))
+		(local.set $envlen (i32.load (i32.const 12)))
+		(if (i32.eqz (local.get $envc))
+			(then (call $exit_error (i32.const 16056) (i32.const 47))))
+		(local.set $env_ptrs (i32.const 2048))
+		(local.set $env_buf (i32.const 4096))
+		(if (i32.gt_u
+					(i32.add (local.get $env_buf) (local.get $envlen))
+					(i32.const 65536))
+			(then (call $proc_exit (i32.const 75))))
+		(local.set $errno (call $environ_get (local.get $env_ptrs) (local.get $env_buf)))
+		(if (i32.ne (local.get $errno) (i32.const 0))
+			(then (call $proc_exit (local.get $errno))))
+		(local.set $columns_found (i32.const 0))
+		(local.set $idx (i32.const 0))
+		(block $found_columns
+			(loop $override_loop
+				(br_if $found_columns (i32.ge_u (local.get $idx) (local.get $envc)))
+				(local.set $env_ptr
+					(i32.load
+						(i32.add
+							(local.get $env_ptrs)
+							(i32.shl (local.get $idx) (i32.const 2)))))
+				(if (call $starts_with (local.get $env_ptr) (i32.const 16296))
+					(then
+						(local.set $columns
+							(call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 17))))
+						(local.set $columns_found (i32.const 1))
+						(br $found_columns)))
+				(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+				(br $override_loop)))
 
-    (if (i32.lt_s (local.get $columns) (i32.const 0))
-      (then
-        (local.set $idx (i32.const 0))
-        (block $envdone
-          (loop $envloop
-            (br_if $envdone (i32.ge_u (local.get $idx) (local.get $envc)))
-            (local.set $env_ptr
-              (i32.load
-                (i32.add
-                  (local.get $env_ptrs)
-                  (i32.shl (local.get $idx) (i32.const 2)))))
-            (if (call $starts_with (local.get $env_ptr) (i32.const 16032))
-              (then
-                (local.set $columns
-                  (call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 8))))
-                (local.set $columns_found (i32.const 1))
-                (br $envdone)))
-            (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-            (br $envloop)))))
-    (if (i32.eqz (local.get $columns_found))
-      (then (call $exit_error (i32.const 16056) (i32.const 47))))
-    (if (i32.le_s (local.get $columns) (i32.const 0))
-      (then (call $exit_error (i32.const 16112) (i32.const 48))))
+		(if (i32.lt_s (local.get $columns) (i32.const 0))
+			(then
+				(local.set $idx (i32.const 0))
+				(block $envdone
+					(loop $envloop
+						(br_if $envdone (i32.ge_u (local.get $idx) (local.get $envc)))
+						(local.set $env_ptr
+							(i32.load
+								(i32.add
+									(local.get $env_ptrs)
+									(i32.shl (local.get $idx) (i32.const 2)))))
+						(if (call $starts_with (local.get $env_ptr) (i32.const 16032))
+							(then
+								(local.set $columns
+									(call $parse_env_uint (i32.add (local.get $env_ptr) (i32.const 8))))
+								(local.set $columns_found (i32.const 1))
+								(br $envdone)))
+						(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+						(br $envloop)))))
+		(if (i32.eqz (local.get $columns_found))
+			(then (call $exit_error (i32.const 16056) (i32.const 47))))
+		(if (i32.le_s (local.get $columns) (i32.const 0))
+			(then (call $exit_error (i32.const 16112) (i32.const 48))))
 
-    ;; Read one line from stdin.
-    (i32.store (i32.const 12000) (i32.const 6144))
-    (i32.store (i32.const 12004) (i32.const 256))
-    (local.set $errno
-      (call $fd_read
-        (i32.const 0)
-        (i32.const 12000)
-        (i32.const 1)
-        (i32.const 12008)))
-    (if (i32.ne (local.get $errno) (i32.const 0))
-      (then (call $proc_exit (local.get $errno))))
-    (local.set $read_len (i32.load (i32.const 12008)))
-    (if (i32.eqz (local.get $read_len))
-      (then (call $exit_error (i32.const 16184) (i32.const 42))))
+		;; Read one line from stdin.
+		(i32.store (i32.const 12000) (i32.const 6144))
+		(i32.store (i32.const 12004) (i32.const 256))
+		(local.set $errno
+			(call $fd_read
+				(i32.const 0)
+				(i32.const 12000)
+				(i32.const 1)
+				(i32.const 12008)))
+		(if (i32.ne (local.get $errno) (i32.const 0))
+			(then (call $proc_exit (local.get $errno))))
+		(local.set $read_len (i32.load (i32.const 12008)))
+		(if (i32.eqz (local.get $read_len))
+			(then (call $exit_error (i32.const 16184) (i32.const 42))))
 
-    (local.set $percent
-      (call $parse_percent_line (i32.const 6144) (local.get $read_len)))
-    (if (i32.lt_s (local.get $percent) (i32.const 0))
-      (then (call $exit_error (i32.const 16240) (i32.const 49))))
-    (if (i32.gt_s (local.get $percent) (i32.const 100))
-      (then (call $exit_error (i32.const 16240) (i32.const 49))))
+		(local.set $percent
+			(call $parse_percent_line (i32.const 6144) (local.get $read_len)))
+		(if (i32.lt_s (local.get $percent) (i32.const 0))
+			(then (call $exit_error (i32.const 16240) (i32.const 49))))
+		(if (i32.gt_s (local.get $percent) (i32.const 100))
+			(then (call $exit_error (i32.const 16240) (i32.const 49))))
 
-    ;; Compute filled columns (rounded).
-    (local.set $filled
-      (i32.div_u
-        (i32.add
-          (i32.mul (local.get $columns) (local.get $percent))
-          (i32.const 50))
-        (i32.const 100)))
-    (if (i32.gt_u (local.get $filled) (local.get $columns))
-      (then (local.set $filled (local.get $columns))))
-    (local.set $remaining (i32.sub (local.get $columns) (local.get $filled)))
+		;; Compute filled columns (rounded).
+		(local.set $filled
+			(i32.div_u
+				(i32.add
+					(i32.mul (local.get $columns) (local.get $percent))
+					(i32.const 50))
+				(i32.const 100)))
+		(if (i32.gt_u (local.get $filled) (local.get $columns))
+			(then (local.set $filled (local.get $columns))))
+		(local.set $remaining (i32.sub (local.get $columns) (local.get $filled)))
 
-    (local.set $bar_start (i32.const 12288))
-    (local.set $bar_ptr (local.get $bar_start))
-    (local.set $idx (i32.const 0))
-    (block $fill_done
-      (loop $fill_loop
-        (br_if $fill_done (i32.ge_u (local.get $idx) (local.get $filled)))
-        (i32.store8 (local.get $bar_ptr) (i32.const 226))
-        (i32.store8 (i32.add (local.get $bar_ptr) (i32.const 1)) (i32.const 150))
-        (i32.store8 (i32.add (local.get $bar_ptr) (i32.const 2)) (i32.const 136))
-        (local.set $bar_ptr (i32.add (local.get $bar_ptr) (i32.const 3)))
-        (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-        (br $fill_loop)))
-    (local.set $bytes (i32.sub (local.get $bar_ptr) (local.get $bar_start)))
+		(local.set $bar_start (i32.const 12288))
+		(local.set $bar_ptr (local.get $bar_start))
+		(local.set $idx (i32.const 0))
+		(block $fill_done
+			(loop $fill_loop
+				(br_if $fill_done (i32.ge_u (local.get $idx) (local.get $filled)))
+				(i32.store8 (local.get $bar_ptr) (i32.const 226))
+				(i32.store8 (i32.add (local.get $bar_ptr) (i32.const 1)) (i32.const 150))
+				(i32.store8 (i32.add (local.get $bar_ptr) (i32.const 2)) (i32.const 136))
+				(local.set $bar_ptr (i32.add (local.get $bar_ptr) (i32.const 3)))
+				(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+				(br $fill_loop)))
+		(local.set $bytes (i32.sub (local.get $bar_ptr) (local.get $bar_start)))
 
-    (if (i32.eqz (local.get $use_continue))
-      (then
-        (if (local.get $bytes)
-          (then (call $write_fd (i32.const 1) (local.get $bar_start) (local.get $bytes))))
-        (call $write_fd (i32.const 1) (i32.const 16048) (i32.const 1))
-        (call $proc_exit (i32.const 0))))
+		(if (i32.eqz (local.get $use_continue))
+			(then
+				(if (local.get $bytes)
+					(then (call $write_fd (i32.const 1) (local.get $bar_start) (local.get $bytes))))
+				(call $write_fd (i32.const 1) (i32.const 16048) (i32.const 1))
+				(call $proc_exit (i32.const 0))))
 
-    ;; Continue mode pads the remainder with spaces and omits the newline.
-    (local.set $idx (i32.const 0))
-    (block $pad_done
-      (loop $pad_loop
-        (br_if $pad_done (i32.ge_u (local.get $idx) (local.get $remaining)))
-        (i32.store8 (local.get $bar_ptr) (i32.const 32))
-        (local.set $bar_ptr (i32.add (local.get $bar_ptr) (i32.const 1)))
-        (local.set $idx (i32.add (local.get $idx) (i32.const 1)))
-        (br $pad_loop)))
-    (local.set $bytes (i32.sub (local.get $bar_ptr) (local.get $bar_start)))
-    (if (local.get $bytes)
-      (then (call $write_fd (i32.const 1) (local.get $bar_start) (local.get $bytes))))
-    (call $proc_exit (i32.const 0)))
+		;; Continue mode pads the remainder with spaces and omits the newline.
+		(local.set $idx (i32.const 0))
+		(block $pad_done
+			(loop $pad_loop
+				(br_if $pad_done (i32.ge_u (local.get $idx) (local.get $remaining)))
+				(i32.store8 (local.get $bar_ptr) (i32.const 32))
+				(local.set $bar_ptr (i32.add (local.get $bar_ptr) (i32.const 1)))
+				(local.set $idx (i32.add (local.get $idx) (i32.const 1)))
+				(br $pad_loop)))
+		(local.set $bytes (i32.sub (local.get $bar_ptr) (local.get $bar_start)))
+		(if (local.get $bytes)
+			(then (call $write_fd (i32.const 1) (local.get $bar_start) (local.get $bytes))))
+		(call $proc_exit (i32.const 0)))
 )

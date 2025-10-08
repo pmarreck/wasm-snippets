@@ -1,0 +1,252 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  cat <<'USAGE' >&2
+Usage: build_bc [--out DIR]
+
+Compiles GNU bc 1.07.1 for wasm32-wasi using wasi-sdk 27.0.
+
+Options:
+  --out DIR   Directory for build outputs (default: build/bc)
+  -h, --help  Show this help message and exit
+USAGE
+}
+
+die() {
+  echo "build_bc: $*" >&2
+  exit 1
+}
+
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+script_dir=$(cd "$(dirname "$0")" && pwd)
+project_root=$(cd "$script_dir/.." && pwd)
+
+out_dir="build/bc"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --out)
+      [ $# -ge 2 ] || die "--out requires a directory argument"
+      out_dir=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown option: $1"
+      ;;
+  esac
+done
+
+case "$out_dir" in
+  /*) ;;
+  *)
+    out_dir="$project_root/$out_dir"
+    ;;
+esac
+
+mkdir -p "$out_dir"
+out_dir=$(cd "$out_dir" && pwd)
+
+bc_version="1.07.1"
+bc_tar="bc-${bc_version}.tar.gz"
+bc_url="https://ftp.gnu.org/gnu/bc/${bc_tar}"
+bc_sha256="62adfca89b0a1c0164c2cdca59ca210c1d44c3ffc46daf9931cf4942664cb02a"
+
+wasi_sdk_release="27"
+wasi_sdk_version="27.0"
+wasi_sdk_tar="wasi-sdk-${wasi_sdk_version}-x86_64-linux.tar.gz"
+wasi_sdk_url="https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${wasi_sdk_release}/${wasi_sdk_tar}"
+wasi_sdk_sha256="b7d4d944c88503e4f21d84af07ac293e3440b1b6210bfd7fe78e0afd92c23bc2"
+
+download() {
+  url=$1
+  dest=$2
+  sha=$3
+  if [ -f "$dest" ]; then
+    return 0
+  fi
+  tmp="$dest.partial"
+  curl -fsSL "$url" -o "$tmp"
+  actual=$(sha256sum "$tmp" | awk '{print $1}')
+  if [ "$actual" != "$sha" ]; then
+    rm -f "$tmp"
+    die "checksum mismatch for $(basename "$dest")"
+  fi
+  mv "$tmp" "$dest"
+}
+
+extract_tar() {
+  tarball=$1
+  target_dir=$2
+  if [ -d "$target_dir" ]; then
+    return 0
+  fi
+  parent=$(dirname "$target_dir")
+  mkdir -p "$parent"
+  tar -xzf "$tarball" -C "$parent"
+}
+
+ensure_patchelf() {
+  have_cmd patchelf || die "patchelf is required"
+}
+
+patch_toolchain_bins() {
+  toolchain_dir=$1
+  loader=$(patchelf --print-interpreter "$(command -v bash)")
+  glibc_lib=$(patchelf --print-rpath "$(command -v ls)")
+  rpath="${toolchain_dir}/lib:$glibc_lib"
+  find "$toolchain_dir" -type f -perm -111 2>/dev/null | while read -r bin; do
+    case "$(file -b "$bin")" in
+      *ELF*64-bit*)
+        patchelf --set-interpreter "$loader" --set-rpath "$rpath" "$bin" >/dev/null 2>&1 || true
+        ;;
+    esac
+  done
+}
+
+ensure_tools() {
+  for cmd in curl sha256sum tar make gcc awk; do
+    have_cmd "$cmd" || die "required command not found: $cmd"
+  done
+  have_cmd gawk || die "gawk is required (ensure it is on PATH)"
+}
+
+ensure_tools
+ensure_patchelf
+
+tar_dir="$out_dir/tarballs"
+mkdir -p "$tar_dir"
+
+bc_tarball="$tar_dir/$bc_tar"
+wasi_tarball="$tar_dir/$wasi_sdk_tar"
+
+download "$bc_url" "$bc_tarball" "$bc_sha256"
+download "$wasi_sdk_url" "$wasi_tarball" "$wasi_sdk_sha256"
+
+src_root="$out_dir/src"
+wasi_root="$out_dir/toolchain"
+build_root="$out_dir/build"
+mkdir -p "$src_root" "$wasi_root" "$build_root"
+
+bc_src_dir="$src_root/bc-${bc_version}"
+wasi_sdk_dir="$wasi_root/wasi-sdk-${wasi_sdk_version}-x86_64-linux"
+
+extract_tar "$bc_tarball" "$bc_src_dir"
+extract_tar "$wasi_tarball" "$wasi_sdk_dir"
+
+patch_toolchain_bins "$wasi_sdk_dir"
+
+coreutils_dir=$(dirname "$(command -v ls)")
+gawk_bin=$(command -v gawk)
+
+host_build_dir="$build_root/host"
+mkdir -p "$host_build_dir"
+
+fake_bin="$host_build_dir/fake-bin"
+mkdir -p "$fake_bin"
+
+fake_ed="$fake_bin/ed"
+if [ ! -x "$fake_ed" ]; then
+  cat >"$fake_ed" <<'SH'
+#!/bin/sh
+set -eu
+if [ $# -lt 1 ]; then
+  echo "ed shim requires target file" >&2
+  exit 1
+fi
+file=$1
+cat >/dev/null || true
+tmp=$(mktemp "${TMPDIR:-/tmp}/libmath.XXXXXX")
+awk '
+function esc(s) {
+  gsub(/\\/, "\\\\", s)
+  gsub(/"/, "\\\"", s)
+  return s
+}
+{
+  lines[NR] = esc($0)
+}
+END {
+  if (NR == 0) {
+    print "{0}"
+  } else if (NR == 1) {
+    printf("{\"%s\",0}\n", lines[1])
+  } else {
+    printf("{\"%s\",\n", lines[1])
+    for (i = 2; i < NR; i++) {
+      printf("\"%s\",\n", lines[i])
+    }
+    printf("\"%s\",0}\n", lines[NR])
+  }
+}
+' "$file" >"$tmp"
+mv "$tmp" "$file"
+SH
+  chmod +x "$fake_ed"
+fi
+
+host_env_path="$fake_bin:$coreutils_dir:$PATH"
+
+host_configure() {
+  if [ ! -f "$host_build_dir/Makefile" ]; then
+    (cd "$host_build_dir" && PATH="$host_env_path" AWK="$gawk_bin" "$bc_src_dir/configure" --without-readline >/dev/null)
+  fi
+}
+
+host_make_libmath() {
+  if [ ! -f "$host_build_dir/bc/libmath.h" ]; then
+    (cd "$host_build_dir" && PATH="$host_env_path" AWK="$gawk_bin" make >/dev/null)
+  fi
+}
+
+host_configure
+host_make_libmath
+
+host_libmath="$host_build_dir/bc/libmath.h"
+[ -f "$host_libmath" ] || die "failed to produce host libmath.h"
+
+staged_libmath="$out_dir/libmath.h"
+cp "$host_libmath" "$staged_libmath"
+
+wasi_build_dir="$build_root/wasi"
+mkdir -p "$wasi_build_dir"
+
+cc_cmd="$wasi_sdk_dir/bin/clang --target=wasm32-unknown-wasip1 --sysroot=$wasi_sdk_dir/share/wasi-sysroot"
+ar_cmd="$wasi_sdk_dir/bin/llvm-ar"
+ranlib_cmd="$wasi_sdk_dir/bin/llvm-ranlib"
+
+wasi_env_path="$coreutils_dir:$PATH"
+
+wasi_configure() {
+  if [ ! -f "$wasi_build_dir/Makefile" ]; then
+    (cd "$wasi_build_dir" && PATH="$wasi_env_path" AWK="$gawk_bin" CC="$cc_cmd" AR="$ar_cmd" RANLIB="$ranlib_cmd" CFLAGS="-O2 -D_WASI_EMULATED_SIGNAL -funsigned-char" LIBS="-lwasi-emulated-signal" INSTALL="$coreutils_dir/install" "$bc_src_dir/configure" --host=wasm32-unknown-wasip1 --without-readline >/dev/null)
+  fi
+}
+
+wasi_configure
+
+if [ ! -f "$wasi_build_dir/.libmath_rule" ]; then
+  printf '\nlibmath.h: ; # pre-generated\n' >>"$wasi_build_dir/bc/Makefile"
+  touch "$wasi_build_dir/.libmath_rule"
+fi
+
+cp "$staged_libmath" "$wasi_build_dir/bc/libmath.h"
+touch "$wasi_build_dir/bc/libmath.h"
+
+(cd "$wasi_build_dir/lib" && PATH="$wasi_env_path" AWK="$gawk_bin" make >/dev/null)
+(cd "$wasi_build_dir/bc" && PATH="$wasi_env_path" AWK="$gawk_bin" make >/dev/null)
+
+bc_wasm="$wasi_build_dir/bc/bc"
+[ -f "$bc_wasm" ] || die "wasm build did not produce bc binary"
+
+output_wasm="$out_dir/bc.wasm"
+cp "$bc_wasm" "$output_wasm"
+
+echo "$output_wasm"
